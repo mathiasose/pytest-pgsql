@@ -21,6 +21,10 @@ def pytest_addoption(parser):
              '`pytest_pgsql` defaults to 32. Adjusting this up or down can '
              'help performance; see the Postgres documentation for more details.')
 
+    parser.addoption(
+        '--pg-conf-opt', action='append',
+        help='Add a key=value line that will be appended to postgresql.conf')
+
 
 @pytest.fixture(scope='session')
 def database_uri(request):
@@ -39,6 +43,12 @@ def database_uri(request):
         # User wants to change the working memory setting.
         work_mem_setting = '-c work_mem=%dMB ' % work_mem
 
+    conf_opts = request.config.getoption('--pg-conf-opt')
+    if conf_opts:
+        conf_opts_string = ' -c ' + ' -c '.join(conf_opts)
+    else:
+        conf_opts_string = ''
+
     # pylint: disable=bad-continuation,deprecated-method
     with testing.postgresql.Postgresql(
         postgres_args='-c TimeZone=UTC '
@@ -47,7 +57,8 @@ def database_uri(request):
                       '-c full_page_writes=off '
                       + work_mem_setting +
                       '-c checkpoint_timeout=30min '
-                      '-c bgwriter_delay=10000ms') as pgdb:
+                      '-c bgwriter_delay=10000ms'
+                      + conf_opts_string) as pgdb:
         yield pgdb.url()
 
 
